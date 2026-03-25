@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Cuckoo Search — Macro Flowchart</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #f8f9fa; font-family: sans-serif; overflow: hidden; }
+        /* Main viewport for the flowchart */
+        #viewer-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* Style for the back button/link */
+        .nav-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 15px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            z-index: 100;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="nav-link">← Ver Detalhe de Mantegna</a>
+
+    <div id="viewer-container">
+        <object id="macro-svg" type="image/svg+xml" data="Cuckoo_FlujoDiagrama.svg" style="width: 100%; height: 100%;">
+            Your browser does not support SVG viewing.
+        </object>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+
+    <script>
+        // Initialize the interactive controls once the SVG is loaded
+        window.onload = function() {
+            var panZoom = svgPanZoom('#macro-svg', {
+                zoomEnabled: true,
+                controlIconsEnabled: true,
+                fit: true,
+                center: true,
+                minZoom: 0.05, // Lower zoom since this diagram is very long
+                maxZoom: 20
+            });
+
+            // Keep it responsive
+            window.addEventListener('resize', function() {
+                panZoom.resize();
+                panZoom.fit();
+                panZoom.center();
+            });
+        };
+    </script>
+</body>
+</html>
