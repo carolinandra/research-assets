@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Flowchart Viewer</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #f5f5f5; font-family: sans-serif; }
+        /* Container to host the interactive diagram */
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Prevent default browser scroll */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <object id="flowchart-svg" type="image/svg+xml" data="Mantegna_Algoritmo_FlujoDiagrama.svg" style="width: 100%; height: 100%;">
+            Your browser does not support SVG.
+        </object>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+
+    <script>
+        // Wait for the SVG to be fully loaded into the DOM
+        window.onload = function() {
+            var panZoomInstance = svgPanZoom('#flowchart-svg', {
+                zoomEnabled: true,
+                controlIconsEnabled: true, // This adds the + / - navigation UI
+                fit: true,
+                center: true,
+                minZoom: 0.1,
+                maxZoom: 20
+            });
+
+            // Handle window resizing to keep the diagram centered
+            window.addEventListener('resize', function() {
+                panZoomInstance.resize();
+                panZoomInstance.fit();
+                panZoomInstance.center();
+            });
+        };
+    </script>
+</body>
+</html>
