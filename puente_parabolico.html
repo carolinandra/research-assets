@@ -2,189 +2,127 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Construcción Puente Voladizos Sucesivos - Sección Variable</title>
+    <title>Bridge Construction - Inverse Parabolic Haunch</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f0f2f5; color: #333; margin: 0; padding: 20px; }
-        h1 { color: #2c3e50; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        canvas { background: #fafafa; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; cursor: crosshair; }
-        .controls { margin-top: 25px; display: flex; justify-content: center; gap: 10px; }
-        button { padding: 12px 24px; font-size: 15px; cursor: pointer; border: none; border-radius: 6px; transition: background 0.2s; font-weight: bold; }
-        .btn-nav { background: #3498db; color: white; }
-        .btn-nav:hover { background: #2980b9; }
-        .btn-reset { background: #e74c3c; color: white; }
-        .btn-reset:hover { background: #c0392b; }
-        button:disabled { background: #bdc3c7; cursor: not-allowed; }
-        .info { margin-top: 15px; padding: 15px; background: #e8f4fd; border-radius: 8px; border-left: 5px solid #3498db; }
-        #statusTitle { font-weight: bold; font-size: 1.1em; color: #2980b9; margin-bottom: 5px; }
-        #statusDesc { font-size: 0.95em; color: #555; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #eceff1; padding: 20px; }
+        .card { max-width: 950px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        canvas { background: #fdfdfd; border: 1px solid #cfd8dc; border-radius: 4px; }
+        .controls { margin: 20px 0; display: flex; justify-content: center; gap: 15px; }
+        button { padding: 12px 20px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-blue { background: #007bff; color: white; }
+        .btn-blue:hover { background: #0056b3; }
+        .btn-red { background: #ef5350; color: white; }
+        .info-box { background: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 6px solid #2196f3; text-align: left; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Construcción por Voladizos Sucesivos</h1>
-        <p>Visualización esquemática con variación cuadrática de la altura.</p>
-        
-        <canvas id="bridgeCanvas" width="850" height="400"></canvas>
+<div class="card">
+    <h2>Construcción: Parábola de Canto (Tangente en Clave)</h2>
+    <canvas id="bridgeCanvas" width="900" height="450"></canvas>
 
-        <div class="controls">
-            <button class="btn-nav" id="prevBtn" onclick="prevStage()">Etapa Anterior</button>
-            <button class="btn-nav" id="nextBtn" onclick="nextStage()">Siguiente Etapa</button>
-            <button class="btn-reset" onclick="reset()">Reiniciar</button>
-        </div>
-
-        <div class="info">
-            <p id="statusTitle">Etapa 0</p>
-            <p id="statusDesc">Cimentación finalizada y ejecución de la pila principal.</p>
-        </div>
+    <div class="controls">
+        <button class="btn-blue" onclick="changeStage(-1)">Anterior</button>
+        <button class="btn-blue" onclick="changeStage(1)">Siguiente Dovela</button>
+        <button class="btn-red" onclick="reset()">Reiniciar</button>
     </div>
 
-    <script>
-        // --- Geometrical & Technical Settings ---
-        const canvas = document.getElementById('bridgeCanvas');
-        const ctx = canvas.getContext('2d');
-        const statusTitle = document.getElementById('statusTitle');
-        const statusDesc = document.getElementById('statusDesc');
-        const nextBtn = document.getElementById('nextBtn');
-        const prevBtn = document.getElementById('prevBtn');
+    <div class="info-box">
+        <strong id="stageLabel">Etapa 0</strong>: <span id="stageDesc">Iniciando cimentación.</span>
+    </div>
+</div>
 
-        const centerX = canvas.width / 2;
-        const deckTopY = 150; // Constant Y coordinate for the top of the deck
+<script>
+    const canvas = document.getElementById('bridgeCanvas');
+    const ctx = canvas.getContext('2d');
+    const stageLabel = document.getElementById('stageLabel');
+    const stageDesc = document.getElementById('stageDesc');
 
-        let stage = 0;
-        const MAX_SEGMENTS_PER_SIDE = 7;
-        const TOTAL_STAGES = MAX_SEGMENTS_PER_SIDE + 2; // Pila, Table, Segments...
+    // --- Technical Configuration ---
+    let currentStage = 0;
+    const NUM_SEGMENTS = 8; 
+    const PIER_HEIGHT = 180;
+    const H_PIER = 100;    // Max section height at pier
+    const H_TIP = 25;      // Min section height at cantilever tip
+    const L_CANTILEVER = 400; 
+    const SEG_LEN = L_CANTILEVER / NUM_SEGMENTS;
+    const CENTER_X = canvas.width / 2;
+    const TOP_Y = 180;
 
-        // -- Quadratic Variation Parameters --
-        // Height variation formula: H(x) = ax^2 + c
-        // where x is distance from the center of the pier.
-        const L_cantilever = 350; // Total horizontal length of one arm (px)
-        const H_at_pier = 90;     // Maximum segment height (px)
-        const H_at_tip = 25;      // Minimum segment height at the end of cantilever (px)
-        const segmentLength = L_cantilever / MAX_SEGMENTS_PER_SIDE; // Length of each segment
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // --- Descriptions ---
-        const stageDescriptions = [
-            ["Infraestructura", "Pila principal completada sobre cimentación (no visible). Preparada para recibir la encofrado de la mesa."],
-            ["Dovela Cero (Mesa Pila)", "Construcción de la primera dovela sobre la pila. Sirve de base estable para los carros de avance."],
-            ["Inicio Voladizos (Dovelas 1)", "Instalación de carros de avance. Hormigonado simétrico de las primeras dovelas (1 izq, 1 der)."],
-            ["Etapas 2 a "+MAX_SEGMENTS_PER_SIDE, "Progresión simétrica. Cada etapa añade un par de dovelas. La altura disminuye parabólicamente."],
-            ["Vano Completo", "Se ha alcanzado la máxima longitud del voladizo. Preparación para el cierre."],
-            ["Cierre (Dovela Clave)", "Unión de los voladizos mediante la dovela clave. El puente adquiere continuidad estructural."]
-        ];
+        // 1. Draw Water/Ground
+        ctx.fillStyle = "#bbdefb";
+        ctx.fillRect(0, 350, canvas.width, 100);
 
-        // --- Core Drawing Function ---
-        function draw() {
-            // 1. Clear Canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // 2. Draw Main Pier (Pila)
+        ctx.fillStyle = "#90a4ae";
+        ctx.fillRect(CENTER_X - 25, TOP_Y, 50, PIER_HEIGHT);
 
-            // 2. Draw Environment (Water)
-            ctx.fillStyle = "#a2d2ff";
-            ctx.fillRect(0, 320, canvas.width, 80);
+        if (currentStage === 0) {
+            stageLabel.innerText = "Etapa 0";
+            stageDesc.innerText = "Pila terminada. Preparación para dovela sobre pila.";
+            return;
+        }
 
-            // 3. Draw Pier (Pila)
-            ctx.fillStyle = "#7f8c8d";
-            ctx.fillRect(centerX - 25, 150, 50, 180); // Pier body
+        // 3. Draw Pier Table (Dovela 0)
+        ctx.fillStyle = "#37474f";
+        ctx.fillRect(CENTER_X - 30, TOP_Y, 60, H_PIER);
 
-            // 4. Update UI Controls
-            nextBtn.disabled = (stage >= TOTAL_STAGES - 1);
-            prevBtn.disabled = (stage <= 0);
+        if (currentStage > 1) {
+            // 4. Draw Segments with Inverse Parabolic geometry
+            // Formula: H(x) = a * (L - x)^2 + H_tip
+            // Where x is the distance from the pier face
+            const a = (H_PIER - H_TIP) / Math.pow(L_CANTILEVER, 2);
 
-            // Update Info Text
-            let descIndex = Math.min(stage, stageDescriptions.length - 1);
-            if (stage > 2 && stage < TOTAL_STAGES - 2) descIndex = 3; // Generic intermediate stages
-            
-            statusTitle.innerText = `Etapa ${stage}: ${stageDescriptions[descIndex][0]}`;
-            if (stage >= 2 && stage < TOTAL_STAGES - 1) {
-                statusDesc.innerText = `Hormigonado simétrico de dovelas ${stage-1}. Altura variable según parábola.`;
-            } else {
-                statusDesc.innerText = stageDescriptions[descIndex][1];
-            }
+            for (let i = 1; i < currentStage; i++) {
+                ctx.fillStyle = (i % 2 === 0) ? "#455a64" : "#607d8b";
+                ctx.strokeStyle = "rgba(255,255,255,0.3)";
 
-            if (stage < 1) return; // Nothing more to draw for stage 0
+                const xStart = 30 + (i - 1) * SEG_LEN;
+                const xEnd = 30 + i * SEG_LEN;
 
-            // 5. Draw Pier Table (Dovela 0) - Constant Max Height
-            ctx.fillStyle = "#2c3e50"; // Dark Concrete
-            ctx.fillRect(centerX - 35, deckTopY, 70, H_at_pier); 
+                // Calculate heights at start and end of segment using the inverse parabola
+                // This makes the curve "flat" at the tip (where distance from pier = L)
+                const hStart = a * Math.pow(L_CANTILEVER - (xStart - 30), 2) + H_TIP;
+                const hEnd = a * Math.pow(L_CANTILEVER - (xEnd - 30), 2) + H_TIP;
 
-            if (stage < 2) return;
-
-            // 6. Draw Balanced Segments (Quadratic Variation)
-            const numSegmentsToDraw = Math.min(stage - 1, MAX_SEGMENTS_PER_SIDE);
-            
-            for (let i = 1; i <= numSegmentsToDraw; i++) {
-                // Color alternating segments for visualization
-                ctx.fillStyle = (i % 2 === 0) ? "#34495e" : "#5d6d7e";
-                ctx.strokeStyle = "#fff"; // White segment lines
-                ctx.lineWidth = 1;
-
-                // Calculate x-coordinates relative to center
-                const x_start = 35 + ((i - 1) * segmentLength); // 35 is half pier table width
-                const x_end = 35 + (i * segmentLength);
-
-                // Calculate variable height using quadratic function: H = a*x^2 + c
-                // Coefficient a = (H_tip - H_pier) / L^2 (Note: a is negative)
-                const coefA = (H_at_tip - H_at_pier) / (L_cantilever * L_cantilever);
+                // Draw Left Segment
+                drawSegment(CENTER_X - xStart, CENTER_X - xEnd, hStart, hEnd);
                 
-                // Segment heights at start and end of segment i
-                const h_start = coefA * (Math.pow((i-1)*segmentLength, 2)) + H_at_pier;
-                const h_end = coefA * (Math.pow(i*segmentLength, 2)) + H_at_pier;
-
-                // --- Draw Left Segment (as a quadrilateral) ---
-                ctx.beginPath();
-                ctx.moveTo(centerX - x_start, deckTopY); // Top Left start
-                ctx.lineTo(centerX - x_end, deckTopY);   // Top Left end
-                ctx.lineTo(centerX - x_end, deckTopY + h_end); // Bottom Left end
-                ctx.lineTo(centerX - x_start, deckTopY + h_start); // Bottom Left start
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-
-                // --- Draw Right Segment (Symmetric) ---
-                ctx.beginPath();
-                ctx.moveTo(centerX + x_start, deckTopY); // Top Right start
-                ctx.lineTo(centerX + x_end, deckTopY);   // Top Right end
-                ctx.lineTo(centerX + x_end, deckTopY + h_end); // Bottom Right end
-                ctx.lineTo(centerX + x_start, deckTopY + h_start); // Bottom Right start
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
+                // Draw Right Segment (Symmetry)
+                drawSegment(CENTER_X + xStart, CENTER_X + xEnd, hStart, hEnd);
             }
-
-            // 7. Draw Closure Segment (Clave) - Only in final stage
-            if (stage === TOTAL_STAGES - 1) {
-                ctx.fillStyle = "#f1c40f"; // Highlight closure
-                ctx.fillRect(centerX - L_cantilever - 45, deckTopY, 10, H_at_tip); // Example closure Left
-                ctx.fillRect(centerX + L_cantilever + 35, deckTopY, 10, H_at_tip); // Example closure Right
-                // Note: Standard depiction shows central closure, this schematic assumes end spans are complete.
-                statusTitle.innerText = "Etapa Final: Continuidad";
-                statusDesc.innerText = "Unión del voladizo con el tramo adyacente o estribo (Clave). El puente se convierte en una estructura continua.";
-            }
+            
+            stageLabel.innerText = `Etapa ${currentStage - 1}`;
+            stageDesc.innerText = "Colocación de dovelas simétricas. Note cómo la pendiente de la base se suaviza hacia los extremos.";
         }
+    }
 
-        // --- Interaction Logic ---
-        function nextStage() {
-            if (stage < TOTAL_STAGES - 1) {
-                stage++;
-                draw();
-            }
-        }
+    function drawSegment(x1, x2, h1, h2) {
+        ctx.beginPath();
+        ctx.moveTo(x1, TOP_Y);
+        ctx.lineTo(x2, TOP_Y);
+        ctx.lineTo(x2, TOP_Y + h2);
+        ctx.lineTo(x1, TOP_Y + h1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
 
-        function prevStage() {
-            if (stage > 0) {
-                stage--;
-                draw();
-            }
-        }
-
-        function reset() {
-            stage = 0;
-            draw();
-        }
-
-        // --- Initial Load ---
+    function changeStage(val) {
+        currentStage = Math.max(0, Math.min(NUM_SEGMENTS + 2, currentStage + val));
         draw();
-    </script>
+    }
+
+    function reset() {
+        currentStage = 0;
+        draw();
+    }
+
+    draw();
+</script>
+
 </body>
 </html>
