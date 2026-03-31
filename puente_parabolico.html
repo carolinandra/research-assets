@@ -412,21 +412,22 @@ function updateText() {
   const n = stage > 0 ? Math.min(stage - 1, MAX_SEG) : 0;
 
   if (stage === 0) {
-    title.textContent = "Etapa 0 — Pilas terminadas";
-    text.textContent  = "Ambas pilas están construidas con sus cabezales. Se inicia el avance en voladizo simétrico desde cada pila.";
+    title.textContent = "Etapa 0 — Pilares concluídos";
+    text.textContent  = "Ambos os pilares estão construídos com seus capitéis. Inicia-se o avanço em balanço simétrico a partir de cada pilar.";
   } else if (stage <= MAX_SEG + 1) {
     const i = stage - 1;
-    title.textContent = `Etapa ${i + 1} — Dovela ${i + 1} (par simétrico)`;
+    title.textContent = `Etapa ${i + 1} — Aduela ${i + 1} (par simétrico)`;
     if (i === 0) {
-      text.textContent = "Primeras dovelas colocadas. Se instalan los cables de postensado y se tensan con gatos hidráulicos para comprimir las juntas.";
+      text.textContent = "Primeiras aduelas posicionadas. Instalam-se os cabos de protensão e são tensionados com macacos hidráulicos para comprimir as juntas.";
     } else {
-      text.textContent = `Voladizo de ${i + 1} dovelas por brazo. Cada nueva dovela incorpora cables adicionales que se tensan desde el extremo libre. El pretensado comprime la sección y contraresta el momento negativo del voladizo.`;
+      text.textContent = `Balanço com ${i + 1} aduelas por braço. Cada nova aduela incorpora cabos adicionais que são tensionados a partir da extremidade livre. A protensão comprime a seção e contrabalança o momento negativo do balanço.`;
     }
   } else {
-    title.textContent = "Etapa final — Clave cerrada ✓";
-    text.textContent  = "Dovela de clave colocada. Se instalan cables de continuidad que atraviesan la junta de clave y se tensan para unir los dos voladizos. El puente pasa a comportarse como viga continua.";
+    title.textContent = "Etapa final — Chave fechada ✓";
+    text.textContent  = "Aduela de chave posicionada. Instalam-se cabos de continuidade que atravessam a junta de chave e são tensionados para unir os dois balanços. A estrutura passa a se comportar como uma viga contínua.";
   }
 }
+
 
 function updateDots() {
   const c = document.getElementById('stageDots');
