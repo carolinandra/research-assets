@@ -6,20 +6,36 @@
   button { padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); transition: background 0.15s; }
   button:hover { background: var(--color-background-secondary); }
   button.accent { background: var(--color-background-info); color: var(--color-text-info); border-color: var(--color-border-info); }
+  button.accent2 { background: var(--color-background-warning); color: var(--color-text-warning); border-color: var(--color-border-warning); }
   .status-box { margin-top: 12px; padding: 12px 16px; background: var(--color-background-secondary); border-left: 3px solid var(--color-border-info); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; font-size: 13px; color: var(--color-text-secondary); }
   .status-box b { color: var(--color-text-primary); }
   .stage-counter { margin-top: 8px; display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-border-secondary); transition: background 0.2s; }
   .dot.active { background: var(--color-text-info); }
+  .legend { margin-top: 10px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; font-size: 12px; color: var(--color-text-secondary); align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch { width: 28px; height: 4px; border-radius: 2px; }
 </style>
 
 <div class="wrap">
   <canvas id="bridgeCanvas" width="900" height="520"></canvas>
   <div class="stage-counter" id="stageDots"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#e67e22;"></div> Cable sin tensar</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#e74c3c; height:6px;"></div> Cable tensado (activo)</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#f1c40f; height:10px; border-radius:2px;"></div> Dovela de clave</div>
+    <div class="legend-item">
+      <svg width="16" height="16" viewBox="0 0 16 16" style="flex-shrink:0">
+        <polygon points="8,2 14,14 2,14" fill="#e74c3c"/>
+      </svg>
+      Gato hidráulico
+    </div>
+  </div>
   <div class="controls">
     <button onclick="changeStage(-1)">← Anterior</button>
     <button onclick="changeStage(1)">Siguiente →</button>
     <button class="accent" onclick="toggleMoments()">Diagrama de momentos</button>
+    <button class="accent2" onclick="toggleCables()">Ver cables</button>
     <button onclick="reset()">Reiniciar</button>
   </div>
   <div class="status-box">
@@ -33,6 +49,9 @@ const ctx = canvas.getContext('2d');
 
 let stage = 0;
 let showMoments = false;
+let showCables = true;
+let tensionAnim = 0;
+let animFrame = null;
 
 const W = canvas.width;
 const H = canvas.height;
@@ -42,31 +61,17 @@ const PIER_H = 190;
 const SEG_W = 42;
 const BASE_H = 88;
 const TIP_H = 26;
-const MAX_SEG = 6;   // arms per side per pier
-
-// Haunch half-width (the block sitting on top of the pier)
+const MAX_SEG = 6;
 const HAUNCH = PIER_W / 2 + 4;
-
-// Gap to leave between the two inner arm tips (filled by closure segment)
 const CLOSURE_GAP = 30;
-
-// Total span between pier centers must fit: 2 * (HAUNCH + MAX_SEG * SEG_W) + CLOSURE_GAP
 const NEEDED_HALF = HAUNCH + MAX_SEG * SEG_W + CLOSURE_GAP / 2;
-// Place piers so inner arms end exactly with a gap of CLOSURE_GAP
 const CX1 = W / 2 - NEEDED_HALF;
 const CX2 = W / 2 + NEEDED_HALF;
-
-const TOTAL_STAGES = MAX_SEG + 2; // 0=piers, 1..MAX_SEG+1=segments, last=closure
+const TOTAL_STAGES = MAX_SEG + 2;
 
 function segH(i) {
   const t = i / MAX_SEG;
   return BASE_H - (BASE_H - TIP_H) * t;
-}
-
-// x where inner arm tip ends for a given pier (right side of left pier inner arm)
-function innerTipX(cx, n) {
-  // inner arm of left pier goes to the RIGHT: cx + HAUNCH + n*SEG_W
-  return cx + HAUNCH + n * SEG_W;
 }
 
 function draw() {
@@ -92,8 +97,14 @@ function draw() {
     drawCantilever(CX1, n, isDark);
     drawCantilever(CX2, n, isDark);
 
+    if (showCables && n > 0) {
+      drawAllCables(CX1, n, isDark);
+      drawAllCables(CX2, n, isDark);
+    }
+
     if (stage === TOTAL_STAGES) {
       drawClosure(isDark);
+      if (showCables) drawContinuityCables(isDark);
     }
   }
 
@@ -104,37 +115,28 @@ function draw() {
 }
 
 function drawPier(cx, isDark) {
-  // Shaft
   ctx.fillStyle = isDark ? "#555" : "#95a5a6";
   ctx.fillRect(cx - PIER_W/2, DECK_Y, PIER_W, PIER_H * 0.72);
-  // Foundation
   ctx.fillStyle = isDark ? "#444" : "#7f8c8d";
   ctx.fillRect(cx - PIER_W/2 - 8, DECK_Y + PIER_H * 0.72, PIER_W + 16, 14);
-  // Head cap
   ctx.fillStyle = isDark ? "#3d3d3d" : "#2c3e50";
   ctx.fillRect(cx - HAUNCH, DECK_Y - 6, HAUNCH * 2, 12);
 }
 
 function drawCantilever(cx, n, isDark) {
-  // Central haunch block
   ctx.fillStyle = isDark ? "#4a4a4a" : "#2c3e50";
   ctx.fillRect(cx - HAUNCH, DECK_Y, HAUNCH * 2, BASE_H);
 
   for (let i = 0; i < n; i++) {
     const hNear = segH(i);
     const hFar  = segH(i + 1);
-
     const col = (i % 2 === 0)
       ? (isDark ? "#4a5568" : "#34495e")
       : (isDark ? "#5a6878" : "#5d6d7e");
     ctx.fillStyle = col;
-
-    // Right arm (inner for left pier, outer for right pier)
     const rxS = cx + HAUNCH + i * SEG_W;
     const rxE = rxS + SEG_W;
     drawTrap(rxS, rxE, hNear, hFar);
-
-    // Left arm (outer for left pier, inner for right pier)
     const lxE = cx - HAUNCH - i * SEG_W;
     const lxS = lxE - SEG_W;
     drawTrap(lxS, lxE, hFar, hNear);
@@ -154,29 +156,190 @@ function drawTrap(x1, x2, h1, h2) {
   ctx.stroke();
 }
 
-function drawClosure(isDark) {
-  // Left inner arm tip  = CX1 + HAUNCH + MAX_SEG * SEG_W
-  // Right inner arm tip = CX2 - HAUNCH - MAX_SEG * SEG_W
+// --- CABLES DE POSTENSADO ---
+
+// Tendon path: starts at one tip, curves through top of deck
+function getCableY(xRel, armLen, yTop, yCurve) {
+  // parabola: y = yTop at tips, yCurve at center (pier)
+  const t = xRel / armLen;
+  return yTop + (yCurve - yTop) * (1 - (2*t - 1) * (2*t - 1));
+}
+
+function drawAllCables(cx, n, isDark) {
+  const newSegIdx = n - 1; // last placed segment index (0-based)
+
+  // Draw OLDER cables (already tensed) — all except last
+  for (let cIdx = 0; cIdx < newSegIdx; cIdx++) {
+    drawCable(cx, cIdx, n, true, isDark, 1.0);
+  }
+
+  // Draw NEWEST cable (being tensed) with animation
+  if (newSegIdx >= 0) {
+    const animProgress = Math.min(tensionAnim, 1.0);
+    drawCable(cx, newSegIdx, n, false, isDark, animProgress);
+    if (animProgress >= 1.0) {
+      // re-draw as tensed
+      drawCable(cx, newSegIdx, n, true, isDark, 1.0);
+    }
+    // draw jack at the tip of this cable
+    if (animProgress < 1.0 || tensionAnim > 0.5) {
+      drawJack(cx, newSegIdx, n, isDark, animProgress);
+    }
+  }
+}
+
+function drawCable(cx, cIdx, totalSegs, tensed, isDark, progress) {
+  // Each cable spans from outer tip to inner (pier side) anchor
+  // Cable cIdx covers from segment cIdx outward
+  const armRight_x1 = cx + HAUNCH; // near (pier) end
+  const armRight_x2 = cx + HAUNCH + (cIdx + 1) * SEG_W; // tip at seg cIdx+1
+  const armLeft_x1  = cx - HAUNCH - (cIdx + 1) * SEG_W;
+  const armLeft_x2  = cx - HAUNCH;
+
+  const yAnchor = DECK_Y + 10; // top of section
+  const yMid    = DECK_Y + 6;
+
+  // Right arm cable
+  drawCableArc(armRight_x1, armRight_x2, yAnchor, yMid, tensed, isDark, progress, cIdx);
+  // Left arm cable (mirror)
+  drawCableArc(armLeft_x2, armLeft_x1, yAnchor, yMid, tensed, isDark, progress, cIdx);
+}
+
+function drawCableArc(xStart, xEnd, yAnchor, yMid, tensed, isDark, progress, idx) {
+  const len = Math.abs(xEnd - xStart);
+  const xMid = (xStart + xEnd) / 2;
+  const yc   = yMid - (idx * 2); // slight vertical offset per cable layer
+
+  // Partial draw based on progress (tension travels inward)
+  const drawEndX = tensed ? xEnd : (xStart + (xEnd - xStart) * progress);
+
+  ctx.save();
+  ctx.beginPath();
+  if (tensed) {
+    // Full arc cable
+    ctx.moveTo(xStart, yAnchor);
+    ctx.quadraticCurveTo(xMid, yc, xEnd, yAnchor);
+    ctx.strokeStyle = isDark ? "#c0392b" : "#e74c3c";
+    ctx.lineWidth = tensed ? 2.5 : 1.5;
+    ctx.globalAlpha = 0.9;
+  } else {
+    // Partial — just a straight line being "pulled"
+    ctx.moveTo(xStart, yAnchor);
+    ctx.lineTo(drawEndX, yAnchor - 2 * progress);
+    ctx.strokeStyle = isDark ? "#d35400" : "#e67e22";
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.7 + 0.3 * progress;
+    ctx.setLineDash([4, 3]);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+
+  // Anchor plate at start
+  if (tensed) {
+    ctx.fillStyle = isDark ? "#e74c3c" : "#c0392b";
+    ctx.fillRect(xStart - 3, yAnchor - 5, 6, 10);
+  }
+  ctx.restore();
+}
+
+function drawJack(cx, cIdx, totalSegs, isDark, progress) {
+  // Draw hydraulic jack at the outer tip of the current cable
+  const tipRight = cx + HAUNCH + (cIdx + 1) * SEG_W;
+  const tipLeft  = cx - HAUNCH - (cIdx + 1) * SEG_W;
+  const segHgt   = segH(cIdx + 1);
+  const yTip     = DECK_Y + segHgt / 2;
+
+  // Show jack on both arms
+  [tipRight, tipLeft].forEach((tx, side) => {
+    const dir = side === 0 ? 1 : -1;
+
+    // Jack body
+    ctx.save();
+    ctx.fillStyle = isDark ? "#f39c12" : "#e67e22";
+    ctx.globalAlpha = 0.85 + 0.15 * progress;
+    ctx.fillRect(tx + dir * 2, yTip - 8, dir * 12, 16);
+
+    // Piston extending (animates)
+    ctx.fillStyle = "#e74c3c";
+    const pistonLen = 6 * progress;
+    ctx.fillRect(tx + dir * (14), yTip - 3, dir * pistonLen, 6);
+
+    // Triangle arrow indicating tension direction
+    ctx.fillStyle = "#e74c3c";
+    ctx.beginPath();
+    const ax = tx + dir * (14 + pistonLen + 4);
+    ctx.moveTo(ax, yTip - 6);
+    ctx.lineTo(ax + dir * 8, yTip);
+    ctx.lineTo(ax, yTip + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Label "GATO" only on first jack
+    if (side === 0 && cIdx === 0) {
+      ctx.fillStyle = isDark ? "#f39c12" : "#b7770d";
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = dir > 0 ? "left" : "right";
+      ctx.fillText("GATO", tx + dir * 28, yTip - 12);
+    }
+
+    // Tension force label
+    if (progress > 0.6) {
+      ctx.fillStyle = isDark ? "#e74c3c" : "#c0392b";
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = dir > 0 ? "left" : "right";
+      const fLabel = "T=" + Math.round(progress * 100) + "%";
+      ctx.fillText(fLabel, tx + dir * 14, yTip + 20);
+    }
+    ctx.restore();
+  });
+}
+
+function drawContinuityCables(isDark) {
+  // Continuity tendons across the closure joint
   const x1 = CX1 + HAUNCH + MAX_SEG * SEG_W;
   const x2 = CX2 - HAUNCH - MAX_SEG * SEG_W;
+  const mid = (x1 + x2) / 2;
 
-  // Both arms are at TIP_H height (segH(MAX_SEG))
+  for (let i = 0; i < 2; i++) {
+    const yOffset = 8 + i * 6;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x1 - 40, DECK_Y + yOffset);
+    ctx.lineTo(x2 + 40, DECK_Y + yOffset);
+    ctx.strokeStyle = "#27ae60";
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+
+    // anchor plates
+    ctx.fillStyle = "#27ae60";
+    ctx.fillRect(x1 - 44, DECK_Y + yOffset - 4, 5, 8);
+    ctx.fillRect(x2 + 40, DECK_Y + yOffset - 4, 5, 8);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  ctx.fillStyle = isDark ? "#2ecc71" : "#1e8449";
+  ctx.font = "bold 9px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("CABLES DE CONTINUIDAD", (x1 + x2) / 2, DECK_Y - 4);
+}
+
+function drawClosure(isDark) {
+  const x1 = CX1 + HAUNCH + MAX_SEG * SEG_W;
+  const x2 = CX2 - HAUNCH - MAX_SEG * SEG_W;
   const h = TIP_H;
 
-  // Closure block
   ctx.fillStyle = isDark ? "#c9a800" : "#f1c40f";
   ctx.beginPath();
-  ctx.moveTo(x1, DECK_Y);
-  ctx.lineTo(x2, DECK_Y);
-  ctx.lineTo(x2, DECK_Y + h);
-  ctx.lineTo(x1, DECK_Y + h);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(x1, DECK_Y); ctx.lineTo(x2, DECK_Y);
+  ctx.lineTo(x2, DECK_Y + h); ctx.lineTo(x1, DECK_Y + h);
+  ctx.closePath(); ctx.fill();
   ctx.strokeStyle = isDark ? "#e5bc1e" : "#d4ac0d";
-  ctx.lineWidth = 1;
-  ctx.stroke();
+  ctx.lineWidth = 1; ctx.stroke();
 
-  // Joint lines at each side of the closure
   ctx.strokeStyle = isDark ? "#f1c40f" : "#b8860b";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([3, 3]);
@@ -185,16 +348,14 @@ function drawClosure(isDark) {
   });
   ctx.setLineDash([]);
 
-  // "CLAVE" label
   ctx.fillStyle = isDark ? "#f0d060" : "#7d6608";
   ctx.font = "bold 10px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("CLAVE", (x1 + x2) / 2, DECK_Y - 10);
+  ctx.fillText("CLAVE", (x1 + x2) / 2, DECK_Y - 12);
 }
 
 function drawMoments(isDark) {
   const pY = DECK_Y - 55;
-
   ctx.strokeStyle = isDark ? "#666" : "#ccc";
   ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(40, pY); ctx.lineTo(W - 40, pY); ctx.stroke();
@@ -212,20 +373,14 @@ function drawMoments(isDark) {
       const left  = cx - armLen - HAUNCH;
       const right = cx + armLen + HAUNCH;
       ctx.beginPath();
-      ctx.moveTo(left, pY);
-      ctx.lineTo(cx, pY - mPeak);
-      ctx.lineTo(right, pY);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
+      ctx.moveTo(left, pY); ctx.lineTo(cx, pY - mPeak); ctx.lineTo(right, pY);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     });
-
   } else {
-    // Continuous beam: M(-) at piers, M(+) midspan
     const leftEdge  = CX1 - HAUNCH - MAX_SEG * SEG_W;
     const rightEdge = CX2 + HAUNCH + MAX_SEG * SEG_W;
     const mid = W / 2;
-    const mP = 48;
-    const mM = 18;
+    const mP = 48, mM = 18;
 
     ctx.fillStyle = isDark ? "rgba(46,204,113,0.3)" : "rgba(39,174,96,0.22)";
     ctx.strokeStyle = isDark ? "#2ecc71" : "#27ae60";
@@ -233,42 +388,43 @@ function drawMoments(isDark) {
 
     ctx.beginPath();
     ctx.moveTo(leftEdge, pY);
-    ctx.bezierCurveTo(leftEdge + 20, pY, CX1 - 20, pY - mP, CX1, pY - mP);
-    ctx.bezierCurveTo(CX1 + 20, pY - mP, mid - 30, pY + mM, mid, pY + mM);
-    ctx.bezierCurveTo(mid + 30, pY + mM, CX2 - 20, pY - mP, CX2, pY - mP);
-    ctx.bezierCurveTo(CX2 + 20, pY - mP, rightEdge - 20, pY, rightEdge, pY);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
+    ctx.bezierCurveTo(leftEdge+20, pY, CX1-20, pY-mP, CX1, pY-mP);
+    ctx.bezierCurveTo(CX1+20, pY-mP, mid-30, pY+mM, mid, pY+mM);
+    ctx.bezierCurveTo(mid+30, pY+mM, CX2-20, pY-mP, CX2, pY-mP);
+    ctx.bezierCurveTo(CX2+20, pY-mP, rightEdge-20, pY, rightEdge, pY);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
 
     ctx.fillStyle = isDark ? "#2ecc71" : "#27ae60";
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "center";
+    ctx.font = "11px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("M(−)", CX1, pY - mP - 8);
     ctx.fillText("M(−)", CX2, pY - mP - 8);
     ctx.fillText("M(+)", mid, pY + mM + 14);
   }
 
   ctx.fillStyle = isDark ? "#888" : "#888";
-  ctx.font = "11px sans-serif";
-  ctx.textAlign = "left";
+  ctx.font = "11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("Diagrama de momentos flectores", 44, pY - 8);
 }
 
 function updateText() {
   const title = document.getElementById('stageTitle');
   const text  = document.getElementById('stageText');
+  const n = stage > 0 ? Math.min(stage - 1, MAX_SEG) : 0;
+
   if (stage === 0) {
     title.textContent = "Etapa 0 — Pilas terminadas";
     text.textContent  = "Ambas pilas están construidas con sus cabezales. Se inicia el avance en voladizo simétrico desde cada pila.";
   } else if (stage <= MAX_SEG + 1) {
     const i = stage - 1;
     title.textContent = `Etapa ${i + 1} — Dovela ${i + 1} (par simétrico)`;
-    text.textContent  = i === 0
-      ? "Primeras dovelas colocadas. El momento flector negativo comienza a crecer en los encastres."
-      : `Voladizo de ${i + 1} dovelas por brazo. El momento flector negativo aumenta con la longitud libre.`;
+    if (i === 0) {
+      text.textContent = "Primeras dovelas colocadas. Se instalan los cables de postensado y se tensan con gatos hidráulicos para comprimir las juntas.";
+    } else {
+      text.textContent = `Voladizo de ${i + 1} dovelas por brazo. Cada nueva dovela incorpora cables adicionales que se tensan desde el extremo libre. El pretensado comprime la sección y contraresta el momento negativo del voladizo.`;
+    }
   } else {
     title.textContent = "Etapa final — Clave cerrada ✓";
-    text.textContent  = "Dovela de clave colocada en el vano central. El puente pasa a comportarse como viga continua: aparece momento positivo en el vano y se redistribuyen los esfuerzos.";
+    text.textContent  = "Dovela de clave colocada. Se instalan cables de continuidad que atraviesan la junta de clave y se tensan para unir los dos voladizos. El puente pasa a comportarse como viga continua.";
   }
 }
 
@@ -282,9 +438,29 @@ function updateDots() {
   }
 }
 
+function animateTension() {
+  tensionAnim = 0;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  const start = performance.now();
+  const dur = 1200;
+  function step(now) {
+    tensionAnim = Math.min((now - start) / dur, 1.0);
+    draw();
+    if (tensionAnim < 1.0) animFrame = requestAnimationFrame(step);
+    else draw();
+  }
+  animFrame = requestAnimationFrame(step);
+}
+
 function changeStage(v) {
   stage = Math.max(0, Math.min(TOTAL_STAGES, stage + v));
-  draw();
+  if (v > 0 && stage > 0 && stage <= MAX_SEG + 1 && showCables) {
+    tensionAnim = 0;
+    animateTension();
+  } else {
+    tensionAnim = 1;
+    draw();
+  }
 }
 
 function toggleMoments() {
@@ -293,12 +469,25 @@ function toggleMoments() {
   draw();
 }
 
-function reset() {
-  stage = 0;
-  showMoments = false;
-  document.querySelector('button.accent').textContent = "Diagrama de momentos";
+function toggleCables() {
+  showCables = !showCables;
+  const btn = document.querySelector('button.accent2');
+  btn.textContent = showCables ? "Ocultar cables" : "Ver cables";
+  tensionAnim = 1;
   draw();
 }
 
+function reset() {
+  stage = 0;
+  showMoments = false;
+  showCables = true;
+  tensionAnim = 0;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  document.querySelector('button.accent').textContent = "Diagrama de momentos";
+  document.querySelector('button.accent2').textContent = "Ocultar cables";
+  draw();
+}
+
+tensionAnim = 1;
 draw();
 </script>
